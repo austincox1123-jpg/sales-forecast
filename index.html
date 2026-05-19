@@ -2149,8 +2149,19 @@ function checkForecastGaps(filtered, results) {
   const noFlags = document.getElementById('no-flags-msg');
   if (!gapBody || !newBody) return;
 
-  const statMap = new Map(results.map(r => [r.month, r.statValue]));
+  // Only flag within the next 12 months from the first forecast month
   const firstStatMonth = results.length > 0 ? results[0].month : null;
+  let cutoffMonth = null;
+  if (firstStatMonth) {
+    const fm = firstStatMonth.match(/^(\d{4})-(\d{2})/);
+    if (fm) {
+      let yr = parseInt(fm[1]), mo = parseInt(fm[2]) - 1;
+      mo += 12; yr += Math.floor(mo / 12); mo = mo % 12;
+      cutoffMonth = yr + '-' + String(mo + 1).padStart(2, '0') + '-99';
+    }
+  }
+  const flagResults = cutoffMonth ? results.filter(r => r.month <= cutoffMonth) : results.slice(0, 12);
+  const statMap = new Map(flagResults.map(r => [r.month, r.statValue]));
 
   // Aggregate existing forecasts by product/month
   const existingByKey = new Map();
@@ -2165,10 +2176,10 @@ function checkForecastGaps(filtered, results) {
   }
   const existingMonths = new Set([...existingByKey.values()].map(v => v.month));
 
-  // GAP: existing > 0 but stat = 0 or missing
+  // GAP: existing > 0 but stat = 0 or missing (next 12 months only)
   const gaps = [];
   for (const [, info] of existingByKey) {
-    if (firstStatMonth && info.month >= firstStatMonth) {
+    if (firstStatMonth && info.month >= firstStatMonth && (!cutoffMonth || info.month <= cutoffMonth)) {
       const statVal = statMap.get(info.month);
       if (statVal === 0 || statVal === undefined || (statVal != null && statVal <= 0)) {
         gaps.push(info);
@@ -2176,9 +2187,9 @@ function checkForecastGaps(filtered, results) {
     }
   }
 
-  // NEW COVERAGE: stat > 0 but no existing forecast
+  // NEW COVERAGE: stat > 0 but no existing forecast (next 12 months only)
   const newCoverage = [];
-  for (const r of results) {
+  for (const r of flagResults) {
     if (r.statValue > 0 && !existingMonths.has(r.month)) {
       // Get product name from filtered rows (best effort)
       const prodRow = filtered.find(f => true); // aggregated view — use filter context
