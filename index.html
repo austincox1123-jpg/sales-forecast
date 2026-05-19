@@ -2097,24 +2097,41 @@ function checkForecastGaps(filtered, results) {
   // Build stat forecast map (month => statValue)
   const statMap = new Map(results.map(r => [r.month, r.statValue]));
 
-  // Find product/month combos where existing forecast > 0 but stat forecast = 0
-  // Group by product for cleaner display
-  const gaps = [];
-  const seen = new Set();
+  // Build set of months covered by the stat forecast
+  const statMonths = new Set(results.map(r => r.month));
+
+  // Aggregate existing forecasts by product/month from the filtered rows
+  // (multiple rows per product/month may exist)
+  const existingByKey = new Map();
   for (const row of filtered) {
     if (row.forecast != null && row.forecast > 0) {
-      const statVal = statMap.get(row.month);
-      if (statVal === 0 || statVal === undefined) {
-        const gapKey = (row.productNumber || row.productName || 'Unknown') + '|' + row.month;
-        if (!seen.has(gapKey)) {
-          seen.add(gapKey);
-          gaps.push({
-            product: row.productName || row.productNumber || 'Unknown',
-            productNumber: row.productNumber || '',
-            month: row.month,
-            existingFcst: row.forecast,
-          });
-        }
+      const pk = (row.productNumber || row.productName || 'Unknown') + '|' + row.month;
+      if (!existingByKey.has(pk)) {
+        existingByKey.set(pk, {
+          product: row.productName || row.productNumber || 'Unknown',
+          productNumber: row.productNumber || '',
+          month: row.month,
+          existingFcst: 0,
+        });
+      }
+      existingByKey.get(pk).existingFcst += row.forecast;
+    }
+  }
+
+  // Find gaps: existing forecast > 0 on months where stat forecast is 0 or
+  // on months that fall within the stat forecast range but have no stat value.
+  // We check: (a) month is in the stat horizon and stat=0, OR
+  //            (b) month is >= first stat month (would be overwritten by save) and stat is missing
+  const gaps = [];
+  const firstStatMonth = results.length > 0 ? results[0].month : null;
+
+  for (const [, info] of existingByKey) {
+    // Only flag months that would be affected by saving — months >= first forecast month
+    if (firstStatMonth && info.month >= firstStatMonth) {
+      const statVal = statMap.get(info.month);
+      // Gap if: stat is 0, or month falls within range but has no stat coverage
+      if (statVal === 0 || statVal === undefined || (statVal != null && statVal <= 0)) {
+        gaps.push(info);
       }
     }
   }
