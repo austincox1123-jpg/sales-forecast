@@ -373,27 +373,6 @@
             </div>
           </div>
 
-          <!-- Top Items (collapsible) -->
-          <div class="card mt-4 p-6" id="top-items-section">
-            <div class="flex justify-between items-center" style="cursor:pointer;" onclick="toggleTopItems()">
-              <h2 class="text-sm font-semibold text-gray-700"><span id="top-items-arrow">&#9660;</span> Top Items — Last 3 Months</h2>
-              <button id="back-to-all-btn" class="hidden" onclick="event.stopPropagation(); resetFilters()" style="background:none; font-size:12px; color:#2563eb; text-decoration:underline; border:none; cursor:pointer;">← Back to All</button>
-            </div>
-            <div id="top-items-content" class="mt-4">
-              <div class="grid-container" style="max-height:350px">
-                <table class="data-grid">
-                  <thead><tr>
-                    <th style="min-width:100px">Customer</th>
-                    <th style="min-width:100px">Product</th>
-                    <th class="num top-sort" data-col="orders" style="cursor:pointer">Orders <span id="sort-orders-icon">&#9660;</span></th>
-                    <th class="num top-sort" data-col="pos" style="cursor:pointer">POS <span id="sort-pos-icon"></span></th>
-                  </tr></thead>
-                  <tbody id="top-items-body"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
           <!-- Data grid -->
           <div class="card mt-4" style="overflow:hidden">
             <div class="grid-container">
@@ -406,29 +385,82 @@
             </div>
           </div>
 
-          <!-- Forecast Gap Table -->
-          <div id="forecast-gap-section" class="card mt-4 hidden" style="overflow:hidden; border-color:#fde68a;">
-            <div class="p-4" style="background:#fffbeb; border-bottom:1px solid #fde68a;">
-              <div class="flex justify-between items-center">
-                <div>
-                  <h2 class="text-sm font-semibold" style="color:#92400e;">Forecast at Risk — Existing Forecast Would Be Cleared</h2>
-                  <p class="text-xs" style="color:#a16207; margin-top:2px;">These product/month combinations have an existing forecast &gt;0 but the stat forecast is 0 or missing. Saving will overwrite them.</p>
+          <!-- Horizontal row: Top Items | Zero-Out Log | Gaps side by side -->
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:16px;">
+
+            <!-- Top Items -->
+            <div class="card p-4" id="top-items-section">
+              <div class="flex justify-between items-center" style="cursor:pointer;" onclick="toggleTopItems()">
+                <h2 class="text-sm font-semibold text-gray-700"><span id="top-items-arrow">&#9660;</span> Top Items — Last 3 Mo</h2>
+                <button id="back-to-all-btn" class="hidden" onclick="event.stopPropagation(); resetFilters()" style="background:none; font-size:12px; color:#2563eb; text-decoration:underline; border:none; cursor:pointer;">← Back</button>
+              </div>
+              <div id="top-items-content" class="mt-2">
+                <div class="grid-container" style="max-height:280px">
+                  <table class="data-grid">
+                    <thead><tr>
+                      <th style="min-width:80px">Customer</th>
+                      <th style="min-width:80px">Product</th>
+                      <th class="num top-sort" data-col="orders" style="cursor:pointer">Orders <span id="sort-orders-icon">&#9660;</span></th>
+                      <th class="num top-sort" data-col="pos" style="cursor:pointer">POS <span id="sort-pos-icon"></span></th>
+                    </tr></thead>
+                    <tbody id="top-items-body"></tbody>
+                  </table>
                 </div>
-                <span id="gap-count-badge" style="background:#fef3c7; color:#92400e; font-size:12px; font-weight:700; padding:4px 10px; border-radius:12px; border:1px solid #fde68a;"></span>
               </div>
             </div>
-            <div class="grid-container" style="max-height:300px;">
-              <table class="data-grid">
-                <thead><tr>
-                  <th>Product</th>
-                  <th>Month</th>
-                  <th class="num">Existing Forecast</th>
-                  <th class="num">Stat Forecast</th>
-                  <th class="num">At Risk (Cases)</th>
-                </tr></thead>
-                <tbody id="forecast-gap-body"></tbody>
-              </table>
+
+            <!-- Zero-Out Log (clickable to filter) -->
+            <div class="card p-4" id="zero-out-log-section">
+              <h2 class="text-sm font-semibold text-gray-700 mb-2">Zero-Out Log</h2>
+              <div class="grid-container" style="max-height:280px">
+                <table class="data-grid">
+                  <thead><tr>
+                    <th>Customer</th>
+                    <th>Product</th>
+                    <th class="num">Months</th>
+                    <th>When</th>
+                  </tr></thead>
+                  <tbody id="zero-out-log-body"></tbody>
+                </table>
+              </div>
             </div>
+
+            <!-- Forecast Gaps: at risk + new coverage -->
+            <div class="card p-4">
+              <h2 class="text-sm font-semibold text-gray-700 mb-2">Forecast Coverage Flags</h2>
+              <!-- At Risk: existing>0, stat=0 -->
+              <div id="forecast-gap-section" class="hidden" style="margin-bottom:12px;">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-xs font-semibold" style="color:#92400e;">At Risk — Would Clear Existing</span>
+                  <span id="gap-count-badge" style="background:#fef3c7; color:#92400e; font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; border:1px solid #fde68a;"></span>
+                </div>
+                <div class="grid-container" style="max-height:120px;">
+                  <table class="data-grid">
+                    <thead><tr>
+                      <th>Product</th><th>Month</th><th class="num">Existing</th><th class="num">At Risk</th>
+                    </tr></thead>
+                    <tbody id="forecast-gap-body"></tbody>
+                  </table>
+                </div>
+              </div>
+              <!-- New Coverage: stat>0, existing=0 -->
+              <div id="new-coverage-section" class="hidden">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-xs font-semibold" style="color:#166534;">New Coverage — No Existing Forecast</span>
+                  <span id="new-coverage-badge" style="background:#dcfce7; color:#166534; font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; border:1px solid #bbf7d0;"></span>
+                </div>
+                <div class="grid-container" style="max-height:120px;">
+                  <table class="data-grid">
+                    <thead><tr>
+                      <th>Product</th><th>Month</th><th class="num">Stat Fcst</th>
+                    </tr></thead>
+                    <tbody id="new-coverage-body"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div id="no-flags-msg" class="text-xs text-gray-400" style="padding:12px 0; text-align:center;">Run Recalculate to check coverage flags</div>
+            </div>
+
           </div>
         </div>
 
@@ -2108,12 +2140,17 @@ function saveForecast() {
 // FORECAST GAP DETECTION — stat=0 but existing forecast>0
 // ============================================================
 function checkForecastGaps(filtered, results) {
-  const sectionEl = document.getElementById('forecast-gap-section');
-  const bodyEl = document.getElementById('forecast-gap-body');
-  const badgeEl = document.getElementById('gap-count-badge');
-  if (!sectionEl || !bodyEl) return;
+  const gapSection = document.getElementById('forecast-gap-section');
+  const gapBody = document.getElementById('forecast-gap-body');
+  const gapBadge = document.getElementById('gap-count-badge');
+  const newSection = document.getElementById('new-coverage-section');
+  const newBody = document.getElementById('new-coverage-body');
+  const newBadge = document.getElementById('new-coverage-badge');
+  const noFlags = document.getElementById('no-flags-msg');
+  if (!gapBody || !newBody) return;
 
   const statMap = new Map(results.map(r => [r.month, r.statValue]));
+  const firstStatMonth = results.length > 0 ? results[0].month : null;
 
   // Aggregate existing forecasts by product/month
   const existingByKey = new Map();
@@ -2121,54 +2158,67 @@ function checkForecastGaps(filtered, results) {
     if (row.forecast != null && row.forecast > 0) {
       const pk = (row.productNumber || row.productName || 'Unknown') + '|' + row.month;
       if (!existingByKey.has(pk)) {
-        existingByKey.set(pk, {
-          product: row.productName || row.productNumber || 'Unknown',
-          productNumber: row.productNumber || '',
-          month: row.month,
-          existingFcst: 0,
-        });
+        existingByKey.set(pk, { product: row.productName || row.productNumber || 'Unknown', month: row.month, existingFcst: 0 });
       }
       existingByKey.get(pk).existingFcst += row.forecast;
     }
   }
+  const existingMonths = new Set([...existingByKey.values()].map(v => v.month));
 
-  // Find gaps: existing > 0 but stat = 0 or missing, within forecast range
+  // GAP: existing > 0 but stat = 0 or missing
   const gaps = [];
-  const firstStatMonth = results.length > 0 ? results[0].month : null;
-
   for (const [, info] of existingByKey) {
     if (firstStatMonth && info.month >= firstStatMonth) {
       const statVal = statMap.get(info.month);
       if (statVal === 0 || statVal === undefined || (statVal != null && statVal <= 0)) {
-        gaps.push({ ...info, statVal: statVal || 0 });
+        gaps.push(info);
       }
     }
   }
 
-  if (gaps.length === 0) {
-    sectionEl.classList.add('hidden');
-    return;
+  // NEW COVERAGE: stat > 0 but no existing forecast
+  const newCoverage = [];
+  for (const r of results) {
+    if (r.statValue > 0 && !existingMonths.has(r.month)) {
+      // Get product name from filtered rows (best effort)
+      const prodRow = filtered.find(f => true); // aggregated view — use filter context
+      newCoverage.push({ month: r.month, statVal: r.statValue });
+    }
   }
 
-  gaps.sort((a, b) => a.product.localeCompare(b.product) || a.month.localeCompare(b.month));
+  function fmtMonth(m) { const d = new Date(m + 'T00:00:00'); return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); }
+  const productLabel = (filtered[0] || {}).productName || (filtered[0] || {}).productNumber || 'Current Selection';
 
-  let html = '';
-  for (const g of gaps) {
-    const d = new Date(g.month + 'T00:00:00');
-    const monthLabel = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    const atRisk = Math.round(g.existingFcst);
-    html += '<tr>' +
-      '<td>' + sanitize(g.product) + '</td>' +
-      '<td>' + monthLabel + '</td>' +
-      '<td class="num">' + Math.round(g.existingFcst).toLocaleString() + '</td>' +
-      '<td class="num" style="color:#dc2626;">0</td>' +
-      '<td class="num" style="color:#b91c1c; font-weight:700;">−' + atRisk.toLocaleString() + '</td>' +
-      '</tr>';
+  // Render gaps
+  if (gaps.length > 0) {
+    gaps.sort((a, b) => a.month.localeCompare(b.month));
+    let html = '';
+    for (const g of gaps) {
+      html += '<tr><td>' + sanitize(g.product) + '</td><td>' + fmtMonth(g.month) + '</td><td class="num">' + Math.round(g.existingFcst).toLocaleString() + '</td><td class="num" style="color:#b91c1c; font-weight:700;">−' + Math.round(g.existingFcst).toLocaleString() + '</td></tr>';
+    }
+    gapBody.innerHTML = html;
+    if (gapBadge) gapBadge.textContent = gaps.length;
+    gapSection.classList.remove('hidden');
+  } else {
+    gapSection.classList.add('hidden');
   }
 
-  bodyEl.innerHTML = html;
-  if (badgeEl) badgeEl.textContent = gaps.length + ' at risk';
-  sectionEl.classList.remove('hidden');
+  // Render new coverage
+  if (newCoverage.length > 0) {
+    newCoverage.sort((a, b) => a.month.localeCompare(b.month));
+    let html = '';
+    for (const n of newCoverage) {
+      html += '<tr><td>' + sanitize(productLabel) + '</td><td>' + fmtMonth(n.month) + '</td><td class="num" style="color:#166534; font-weight:600;">+' + Math.round(n.statVal).toLocaleString() + '</td></tr>';
+    }
+    newBody.innerHTML = html;
+    if (newBadge) newBadge.textContent = newCoverage.length;
+    newSection.classList.remove('hidden');
+  } else {
+    newSection.classList.add('hidden');
+  }
+
+  // Hide "no flags" message if either section is visible
+  if (noFlags) noFlags.style.display = (gaps.length > 0 || newCoverage.length > 0) ? 'none' : 'block';
 }
 
 function zeroOutForecasts() {
@@ -2610,38 +2660,44 @@ function renderSavedPanel() {
 }
 
 function renderZeroOutLog() {
-  let logEl = document.getElementById('zero-out-log');
-  if (!logEl) {
-    // Create the log container after the saved panel
-    const savedPanel = document.querySelector('.saved-panel');
-    if (!savedPanel) return;
-    logEl = document.createElement('div');
-    logEl.id = 'zero-out-log';
-    logEl.className = 'card p-4';
-    logEl.style.marginTop = '16px';
-    savedPanel.parentElement.insertBefore(logEl, savedPanel.nextSibling);
-  }
+  const tbody = document.getElementById('zero-out-log-body');
+  if (!tbody) return;
 
   const log = state.zeroOutLog || [];
   if (log.length === 0) {
-    logEl.style.display = 'none';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-gray-400 text-xs" style="padding:12px; text-align:center;">No zero-outs recorded</td></tr>';
     return;
   }
 
-  logEl.style.display = 'block';
-  let html = '<h2 class="text-sm font-semibold text-gray-700 mb-2">Zero-Out Log</h2>';
-  html += '<p class="text-xs text-gray-400 mb-2">' + log.length + ' action' + (log.length > 1 ? 's' : '') + ' recorded</p>';
-  html += '<div style="max-height:160px; overflow-y:auto;">';
+  let html = '';
   for (let i = log.length - 1; i >= 0; i--) {
     const entry = log[i];
-    html += '<div style="padding:6px 8px; border:1px solid #fecaca; border-radius:6px; margin-bottom:4px; font-size:11px; background:#fef2f2;">';
-    html += '<div style="font-weight:600; color:#b91c1c;">' + sanitize(entry.customer) + ' / ' + sanitize(entry.product) + '</div>';
-    html += '<div style="color:#6b7280;">' + entry.months + ' months zeroed · ' + entry.timestamp + '</div>';
-    html += '<div style="color:#92400e; font-style:italic;">' + entry.by + '</div>';
-    html += '</div>';
+    html += '<tr style="cursor:pointer;" data-customer="' + sanitize(entry.customer) + '" data-product="' + sanitize(entry.product) + '">' +
+      '<td style="color:#b91c1c;">' + sanitize(entry.customer) + '</td>' +
+      '<td style="color:#b91c1c;">' + sanitize(entry.product) + '</td>' +
+      '<td class="num">' + entry.months + '</td>' +
+      '<td class="text-xs text-gray-500">' + entry.timestamp + '</td>' +
+      '</tr>';
   }
-  html += '</div>';
-  logEl.innerHTML = html;
+  tbody.innerHTML = html;
+
+  // Click row to filter to that customer/product
+  tbody.onclick = function(e) {
+    const tr = e.target.closest('tr');
+    if (!tr || !tr.dataset.customer) return;
+    const cust = tr.dataset.customer;
+    const prod = tr.dataset.product;
+    if (cust && cust !== 'All') {
+      document.getElementById('filter-customer').value = cust;
+      state.filters.customer = cust;
+    }
+    if (prod && prod !== 'All') {
+      document.getElementById('filter-product').value = prod;
+      state.filters.product = prod;
+    }
+    invalidateCache();
+    renderDashboard();
+  };
 }
 
 function deleteForecast(key) {
