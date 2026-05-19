@@ -2163,13 +2163,19 @@ function checkForecastGaps(filtered, results) {
   const flagResults = cutoffMonth ? results.filter(r => r.month <= cutoffMonth) : results.slice(0, 12);
   const statMap = new Map(flagResults.map(r => [r.month, r.statValue]));
 
-  // Aggregate existing forecasts by product/month
+  // Aggregate existing forecasts by product/month, keeping customer + product info
   const existingByKey = new Map();
   for (const row of filtered) {
     if (row.forecast != null && row.forecast > 0) {
-      const pk = (row.productNumber || row.productName || 'Unknown') + '|' + row.month;
+      const pk = (row.customerName || '') + '|' + (row.productNumber || row.productName || 'Unknown') + '|' + row.month;
       if (!existingByKey.has(pk)) {
-        existingByKey.set(pk, { product: row.productName || row.productNumber || 'Unknown', month: row.month, existingFcst: 0 });
+        existingByKey.set(pk, {
+          customer: row.customerName || '',
+          product: row.productName || row.productNumber || 'Unknown',
+          productNumber: row.productNumber || '',
+          month: row.month,
+          existingFcst: 0,
+        });
       }
       existingByKey.get(pk).existingFcst += row.forecast;
     }
@@ -2188,12 +2194,13 @@ function checkForecastGaps(filtered, results) {
   }
 
   // NEW COVERAGE: stat > 0 but no existing forecast (next 12 months only)
+  // Derive customer/product from the filtered rows for context
+  const custLabel = (filtered[0] || {}).customerName || '';
+  const prodNum = (filtered[0] || {}).productNumber || '';
   const newCoverage = [];
   for (const r of flagResults) {
     if (r.statValue > 0 && !existingMonths.has(r.month)) {
-      // Get product name from filtered rows (best effort)
-      const prodRow = filtered.find(f => true); // aggregated view — use filter context
-      newCoverage.push({ month: r.month, statVal: r.statValue });
+      newCoverage.push({ month: r.month, statVal: r.statValue, customer: custLabel, productNumber: prodNum });
     }
   }
 
@@ -2205,9 +2212,10 @@ function checkForecastGaps(filtered, results) {
     gaps.sort((a, b) => a.month.localeCompare(b.month));
     let html = '';
     for (const g of gaps) {
-      html += '<tr><td>' + sanitize(g.product) + '</td><td>' + fmtMonth(g.month) + '</td><td class="num">' + Math.round(g.existingFcst).toLocaleString() + '</td><td class="num" style="color:#b91c1c; font-weight:700;">−' + Math.round(g.existingFcst).toLocaleString() + '</td></tr>';
+      html += '<tr style="cursor:pointer;" data-customer="' + sanitize(g.customer) + '" data-product="' + sanitize(g.productNumber) + '"><td>' + sanitize(g.product) + '</td><td>' + fmtMonth(g.month) + '</td><td class="num">' + Math.round(g.existingFcst).toLocaleString() + '</td><td class="num" style="color:#b91c1c; font-weight:700;">−' + Math.round(g.existingFcst).toLocaleString() + '</td></tr>';
     }
     gapBody.innerHTML = html;
+    gapBody.onclick = flagRowClick;
     if (gapBadge) gapBadge.textContent = gaps.length;
     gapSection.classList.remove('hidden');
   } else {
@@ -2219,17 +2227,29 @@ function checkForecastGaps(filtered, results) {
     newCoverage.sort((a, b) => a.month.localeCompare(b.month));
     let html = '';
     for (const n of newCoverage) {
-      html += '<tr><td>' + sanitize(productLabel) + '</td><td>' + fmtMonth(n.month) + '</td><td class="num" style="color:#166534; font-weight:600;">+' + Math.round(n.statVal).toLocaleString() + '</td></tr>';
+      html += '<tr style="cursor:pointer;" data-customer="' + sanitize(n.customer) + '" data-product="' + sanitize(n.productNumber) + '"><td>' + sanitize(productLabel) + '</td><td>' + fmtMonth(n.month) + '</td><td class="num" style="color:#166534; font-weight:600;">+' + Math.round(n.statVal).toLocaleString() + '</td></tr>';
     }
     newBody.innerHTML = html;
+    newBody.onclick = flagRowClick;
     if (newBadge) newBadge.textContent = newCoverage.length;
     newSection.classList.remove('hidden');
   } else {
     newSection.classList.add('hidden');
   }
 
-  // Hide "no flags" message if either section is visible
   if (noFlags) noFlags.style.display = (gaps.length > 0 || newCoverage.length > 0) ? 'none' : 'block';
+}
+
+// Shared click handler for flag table rows — filters report to that customer/product
+function flagRowClick(e) {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  const cust = tr.dataset.customer;
+  const prod = tr.dataset.product;
+  if (cust) { document.getElementById('filter-customer').value = cust; state.filters.customer = cust; }
+  if (prod) { document.getElementById('filter-product').value = prod; state.filters.product = prod; }
+  invalidateCache();
+  renderDashboard();
 }
 
 function zeroOutForecasts() {
