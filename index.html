@@ -465,6 +465,36 @@
               <input type="checkbox" id="cfg-seasonality">
               <label for="cfg-seasonality" class="text-xs text-gray-600">Apply seasonal indices</label>
             </div>
+
+            <!-- Forecast Backstop -->
+            <div style="border-top:1px solid #e5e7eb; padding-top:12px;">
+              <div class="checkbox-row">
+                <input type="checkbox" id="cfg-backstop" checked>
+                <label for="cfg-backstop" class="text-xs text-gray-700 font-semibold">Forecast Backstop</label>
+              </div>
+              <p class="text-xs text-gray-400 mt-1">Guards against runaway forecasts from steep slopes or outlier spikes.</p>
+              <div id="backstop-options" style="margin-top:8px;">
+                <div>
+                  <label class="label">Max M/M Growth: <span id="growth-cap-val">25</span>%</label>
+                  <input type="range" id="cfg-growth-cap" min="5" max="100" step="5" value="25" oninput="document.getElementById('growth-cap-val').textContent=this.value" class="w-full">
+                  <div class="range-labels"><span>5%</span><span>100%</span></div>
+                </div>
+                <div style="margin-top:8px;">
+                  <label class="label">Historical Ceiling: <span id="hist-ceiling-val">2.0</span>x max</label>
+                  <input type="range" id="cfg-hist-ceiling" min="1.0" max="5.0" step="0.25" value="2.0" oninput="document.getElementById('hist-ceiling-val').textContent=parseFloat(this.value).toFixed(1)" class="w-full">
+                  <div class="range-labels"><span>1.0x</span><span>5.0x</span></div>
+                </div>
+                <div class="checkbox-row" style="margin-top:8px;">
+                  <input type="checkbox" id="cfg-trend-dampen" checked>
+                  <label for="cfg-trend-dampen" class="text-xs text-gray-600">Dampen trend over horizon</label>
+                </div>
+                <div class="checkbox-row" style="margin-top:4px;">
+                  <input type="checkbox" id="cfg-outlier-blend" checked>
+                  <label for="cfg-outlier-blend" class="text-xs text-gray-600">Blend outlier spikes with trailing avg</label>
+                </div>
+              </div>
+            </div>
+
             <div>
               <div class="flex justify-between items-center">
                 <label class="label" style="margin-bottom:0">Exclude Months <span style="font-weight:400; color:#9ca3af">(click to toggle)</span></label>
@@ -590,6 +620,30 @@
           <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
             <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Blended</div>
             <div style="font-size:13px; color:#4b5563; line-height:1.6;">When selected as a data source, the engine blends POS and order data using a configurable weight to create a combined signal.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forecast Backstop -->
+      <div class="card p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-4" style="color:#111827;">Forecast Backstop</h2>
+        <p style="font-size:13px; color:#4b5563; line-height:1.6; margin-bottom:12px;">A post-processing guardrail system that prevents any method from producing unrealistic forecasts. Enabled by default. Applied after the statistical method runs but before denormalization and MOQ rounding.</p>
+        <div style="display:grid; gap:12px;">
+          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Layer 1: Growth Rate Cap</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Limits month-over-month change to a configurable maximum percentage (default 25%). Anchored to the last actual data point. Prevents steep slopes from projecting unrealistic ramps. Also prevents sudden drops.</div>
+          </div>
+          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Layer 2: Historical Ceiling</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Caps the forecast at a multiple of the historical maximum (default 2.0x). A product that has never shipped more than 500 cases/month won't suddenly forecast 2,000.</div>
+          </div>
+          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Layer 3: Trend Dampening</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Decays the slope's deviation from the first forecast value using a damping factor (0.85 per period). Month 1 gets the full projected value; by month 6 the trend is roughly halved; by month 12 it's nearly flat. Prevents linear and exponential methods from diverging to infinity.</div>
+          </div>
+          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Layer 4: Outlier-Aware Blending</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Detects if the most recent data point is a statistical outlier (>2 standard deviations from the trailing 6-month mean). When triggered, the forecast is blended with the trailing average so a single spike doesn't hijack the entire projection. Blend strength scales with outlier severity.</div>
           </div>
         </div>
       </div>
@@ -1093,6 +1147,81 @@ function runForecastEngine(actuals, params, horizon) {
         });
       }
     }
+  }
+
+  // ---- FORECAST BACKSTOP ----
+  // Applied BEFORE denormalization so comparisons are on normalized (weekly rate) basis.
+  if (params.backstop && results.length > 0) {
+    // Gather historical stats from the normalized series for reference
+    const histValues = series.map(p => p.value).filter(v => v > 0);
+    const histMax = histValues.length > 0 ? Math.max(...histValues) : Infinity;
+    const histMean = histValues.length > 0 ? histValues.reduce((s,v) => s+v, 0) / histValues.length : 0;
+    const histStdDev = histValues.length > 1
+      ? Math.sqrt(histValues.reduce((s,v) => s + (v - histMean) ** 2, 0) / histValues.length)
+      : histMean * 0.5;
+
+    // Layer 4: Outlier-aware blending — if the last 1-2 data points are outliers
+    // (>2 std devs from trailing mean), blend the raw forecast with a trailing-avg
+    // baseline so one spike doesn't hijack everything.
+    let outlierBlendFactor = 1; // 1 = no blending, <1 = partial blend with trailing avg
+    if (params.outlierBlend && series.length >= 4) {
+      const trailingN = Math.min(6, series.length - 1);
+      const trailing = series.slice(-(trailingN + 1), -1).map(p => p.value);
+      const trailingMean = trailing.reduce((s,v) => s+v, 0) / trailing.length;
+      const trailingStd = Math.sqrt(trailing.reduce((s,v) => s + (v - trailingMean) ** 2, 0) / trailing.length) || (trailingMean * 0.3);
+      const lastVal = series[series.length - 1].value;
+      const zScore = trailingStd > 0 ? Math.abs(lastVal - trailingMean) / trailingStd : 0;
+      if (zScore > 2) {
+        // Blend strength proportional to how extreme the outlier is
+        // z=2 -> 30% trailing blend, z=3 -> 50%, z=4+ -> 60%
+        outlierBlendFactor = Math.max(0.4, 1 - (zScore - 2) * 0.2);
+        const trailingForecast = trailingMean; // flat baseline from non-outlier trailing avg
+        results = results.map(r => ({
+          month: r.month,
+          statValue: r.statValue * outlierBlendFactor + trailingForecast * (1 - outlierBlendFactor)
+        }));
+      }
+    }
+
+    // Layer 3: Trend dampening — decay the deviation from the first forecast value
+    // so that a steep slope gradually flattens over the horizon.
+    if (params.trendDampen && results.length >= 2) {
+      const baseVal = results[0].statValue;
+      const phi = 0.85; // damping factor per period
+      results = results.map((r, i) => {
+        if (i === 0) return r;
+        const deviation = r.statValue - baseVal;
+        // Cumulative damping: deviation * phi^i
+        const dampedDeviation = deviation * Math.pow(phi, i);
+        return { month: r.month, statValue: baseVal + dampedDeviation };
+      });
+    }
+
+    // Layer 1: Growth rate cap — limit month-over-month change
+    const growthCap = params.growthCap || 0.25;
+    // Anchor: last actual value (normalized)
+    let prevValue = series.length > 0 ? series[series.length - 1].value : results[0].statValue;
+    results = results.map(r => {
+      const maxUp = prevValue * (1 + growthCap);
+      const maxDown = prevValue * (1 - growthCap);
+      let capped = Math.min(r.statValue, maxUp);
+      capped = Math.max(capped, maxDown);
+      capped = Math.max(0, capped); // floor at zero
+      prevValue = capped;
+      return { month: r.month, statValue: capped };
+    });
+
+    // Layer 2: Historical ceiling — cap at multiple of historical max
+    const ceiling = histMax * (params.histCeiling || 2.0);
+    if (ceiling > 0 && ceiling < Infinity) {
+      results = results.map(r => ({
+        month: r.month,
+        statValue: Math.min(r.statValue, ceiling)
+      }));
+    }
+
+    // Round after all backstop layers
+    results = results.map(r => ({ month: r.month, statValue: Math.round(r.statValue) }));
   }
 
   // Denormalize: multiply each forecast month's weekly rate by its weeks.
@@ -1835,8 +1964,13 @@ function navigateProduct(direction) {
 function onConfigChange() {
   const method = document.getElementById('cfg-method').value;
   document.getElementById('weight-section').classList.toggle('hidden', method !== 'weighted_ma');
-  document.getElementById('alpha-section').classList.toggle('hidden', method !== 'exp_smoothing' && method !== 'holts');
+  document.getElementById('alpha-section').classList.toggle('hidden', method !== 'exp_smoothing');
 }
+
+// Toggle backstop options visibility
+document.getElementById('cfg-backstop').addEventListener('change', function() {
+  document.getElementById('backstop-options').style.display = this.checked ? 'block' : 'none';
+});
 
 function getConfigParams() {
   const moqVal = document.getElementById('cfg-moq').value;
@@ -1848,6 +1982,11 @@ function getConfigParams() {
     alpha: parseFloat(document.getElementById('cfg-alpha').value),
     seasonality: document.getElementById('cfg-seasonality').checked,
     moq: (moqVal && parseInt(moqVal) > 1) ? parseInt(moqVal) : null,
+    backstop: document.getElementById('cfg-backstop').checked,
+    growthCap: parseInt(document.getElementById('cfg-growth-cap').value) / 100,
+    histCeiling: parseFloat(document.getElementById('cfg-hist-ceiling').value),
+    trendDampen: document.getElementById('cfg-trend-dampen').checked,
+    outlierBlend: document.getElementById('cfg-outlier-blend').checked,
   };
 }
 
