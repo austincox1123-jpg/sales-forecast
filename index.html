@@ -294,7 +294,6 @@
           <span class="text-lg font-semibold">Sales Forecast</span>
           <div class="page-toggle">
             <button class="active" onclick="showForecastView()">Forecast</button>
-            <button onclick="showAnalyticsView()">Analytics</button>
             <button onclick="showDefinitionsView()">Definitions</button>
           </div>
           <span class="text-sm text-gray-500 ml-2" id="file-info"></span>
@@ -415,15 +414,25 @@
             <div>
               <label class="label">Method</label>
               <select id="cfg-method" onchange="onConfigChange()" class="select-field select-sm">
+                <option value="linear_avg">Avg Weekly Run Rate (Fiscal Weeks)</option>
                 <option value="weighted_ma">Weighted Moving Average</option>
                 <option value="exp_smoothing">Exponential Smoothing</option>
                 <option value="pos_lag">POS-to-Shipment Lag</option>
-                <option value="consumption_rate">POS Consumption Rate</option>
-                <option value="linear_avg">Linear Average (Avg Weekly Run Rate)</option>
                 <option value="linear_slope">Linear Trend (Slope)</option>
-                <option value="holts">Holt's Linear Trend (Level + Trend)</option>
-                <option value="croston">Croston's SBA (Intermittent Demand)</option>
-                <option value="holt_winters">Holt-Winters Seasonal (24+ mo required)</option>
+              </select>
+            </div>
+            <div>
+              <label class="label">Forecast Horizon</label>
+              <select id="cfg-horizon" class="select-field select-sm">
+                <option value="3">3 months</option>
+                <option value="6">6 months</option>
+                <option value="9">9 months</option>
+                <option value="12">12 months</option>
+                <option value="15">15 months</option>
+                <option value="18" selected>18 months</option>
+                <option value="24">24 months</option>
+                <option value="30">30 months</option>
+                <option value="36">36 months</option>
               </select>
             </div>
             <div>
@@ -508,132 +517,7 @@
     </div>
   </div>
 
-  <!-- ===== ANALYTICS DASHBOARD VIEW ===== -->
-  <div id="analytics-view" class="min-h-screen hidden">
-    <nav class="nav">
-      <div class="nav-inner justify-between" style="max-width:1280px; margin:0 auto; padding:0 16px;">
-        <div class="flex items-center">
-          <span class="text-lg font-semibold">Sales Forecast</span>
-          <div class="page-toggle">
-            <button onclick="showForecastView()">Forecast</button>
-            <button class="active" onclick="showAnalyticsView()">Analytics</button>
-            <button onclick="showDefinitionsView()">Definitions</button>
-          </div>
-        </div>
-        <div class="flex gap-3">
-          <button onclick="showUpload()" class="px-4 py-2 btn-outline">New Upload</button>
-        </div>
-      </div>
-    </nav>
-
-    <div class="container py-6">
-      <!-- Active filter + Month Exclusion -->
-      <div class="card p-4 mb-6">
-        <div id="analytics-active-filter" class="hidden" style="margin-bottom:8px; padding:6px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; font-size:12px; display:flex; justify-content:space-between; align-items:center;"></div>
-        <div class="flex items-center gap-4">
-          <label class="label" style="margin-bottom:0; white-space:nowrap">Exclude Months</label>
-          <div class="exclude-grid" id="analytics-exclude-months"></div>
-        </div>
-      </div>
-
-      <!-- Executive Summary — Key Insights -->
-      <div class="card p-6 mb-6" id="executive-summary-card" style="display:none;">
-        <h2 class="text-sm font-semibold text-gray-700 mb-3" style="display:flex;align-items:center;gap:6px;">
-          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#2563eb;"></span> Key Insights
-        </h2>
-        <div id="executive-summary-bullets" style="display:flex;flex-direction:column;gap:8px;"></div>
-      </div>
-
-      <div class="analytics-layout">
-        <!-- Left: Stacked KPI cards -->
-        <div class="analytics-left" id="analytics-kpis"></div>
-
-        <!-- Right: Breakdown bars -->
-        <div class="analytics-right">
-          <div class="card p-6 mb-4">
-            <h2 class="text-sm font-semibold text-gray-700 mb-4">Orders & POS | Customer vs PY</h2>
-            <div id="analytics-by-customer"></div>
-          </div>
-          <div class="card p-6 mb-4">
-            <h2 class="text-sm font-semibold text-gray-700 mb-4">Orders & POS | Brand vs PY</h2>
-            <div id="analytics-by-brand"></div>
-          </div>
-          <div class="card p-6">
-            <h2 class="text-sm font-semibold text-gray-700 mb-4">Orders & POS | Type vs PY</h2>
-            <div id="analytics-by-type"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Performance vs PY — Combined Orders, POS, and Forecast -->
-      <div class="card p-6 mt-6" id="vs-py-section">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-sm font-semibold text-gray-700">Performance vs Prior Year</h2>
-          <div class="text-xs text-gray-400" id="vs-py-period-label"></div>
-        </div>
-        <p class="text-xs text-gray-500 mb-4">YTD orders and POS vs same period last year. Existing forecast vs PY Balance of Year (same future months last year).</p>
-        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-          <div>
-            <h3 class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">By Brand</h3>
-            <div id="vs-py-brand"></div>
-          </div>
-          <div>
-            <h3 class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">By Type</h3>
-            <div id="vs-py-type"></div>
-          </div>
-          <div>
-            <h3 class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">By Formation</h3>
-            <div id="vs-py-formation"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Risk & Opportunity Flags -->
-      <div class="card p-6 mt-6" id="risk-opp-card" style="display:none;">
-        <div class="flex justify-between items-center mb-3">
-          <h2 class="text-sm font-semibold text-gray-700">Risk &amp; Opportunity Flags</h2>
-          <div class="text-xs text-gray-400">Top signals by magnitude</div>
-        </div>
-        <p class="text-xs text-gray-500 mb-4">Compares POS trends, order trends, and forecast levels to identify upside, overforecast risk, destocking, or stocking signals.</p>
-        <div id="risk-opp-container"></div>
-      </div>
-
-      <!-- Top Movers -->
-      <div class="card p-6 mt-6" id="top-movers-card" style="display:none;">
-        <div class="flex justify-between items-center mb-3">
-          <h2 class="text-sm font-semibold text-gray-700">Top Movers — Biggest Volume Changes</h2>
-          <div class="text-xs text-gray-400" id="top-movers-period-label"></div>
-        </div>
-        <p class="text-xs text-gray-500 mb-4">Last 3 included months vs prior 3 months. Shows the largest absolute volume shifts.</p>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
-          <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wide mb-2" style="color:#16a34a;">Top Gainers</h3>
-            <div id="top-movers-gainers"></div>
-          </div>
-          <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wide mb-2" style="color:#dc2626;">Top Decliners</h3>
-            <div id="top-movers-decliners"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Account Scorecards -->
-      <div class="card p-6 mt-6" id="account-scorecards-card" style="display:none;">
-        <h2 class="text-sm font-semibold text-gray-700 mb-4">Account Scorecards</h2>
-        <div id="account-scorecards-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:12px;"></div>
-      </div>
-
-      <!-- Item Attribution: Brand > Type > Formation -->
-      <div class="card p-6 mt-6">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-sm font-semibold text-gray-700">Item Attribution — Brand &gt; Type &gt; Formation</h2>
-          <div class="text-xs text-gray-400" id="attribution-breadcrumb"></div>
-        </div>
-        <p class="text-xs text-gray-500 mb-4">Click a segment to drill down. Shows YTD order volume share and vs PY change.</p>
-        <div id="attribution-container"></div>
-      </div>
-    </div>
-  </div>
+  <!-- Analytics view removed -->
 
   <!-- ===== DEFINITIONS VIEW ===== -->
   <div id="definitions-view" class="min-h-screen hidden">
@@ -643,7 +527,6 @@
           <span class="text-lg font-semibold">Sales Forecast</span>
           <div class="page-toggle">
             <button onclick="showForecastView()">Forecast</button>
-            <button onclick="showAnalyticsView()">Analytics</button>
             <button class="active" onclick="showDefinitionsView()">Definitions</button>
           </div>
         </div>
@@ -661,40 +544,29 @@
         <h2 class="text-lg font-semibold mb-4" style="color:#111827;">Forecast Methods</h2>
         <div style="display:grid; gap:12px;">
           <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Avg Weekly Run Rate (Fiscal Weeks)</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Calculates average cases per fiscal week over the lookback window, then multiplies by the fiscal weeks in each future month. Uses the 4-4-5 calendar (editable in sidebar). Best when sales volume is proportional to the number of selling weeks.</div>
+            <div style="margin-top:8px; padding:8px 12px; background:#fff; border:1px solid #e5e7eb; border-radius:6px; font-family:ui-monospace,monospace; font-size:12px; color:#374151;">Forecast(month) = (Total Cases / Total Fiscal Weeks in Lookback) × Fiscal Weeks in Target Month</div>
+          </div>
+          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
             <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Weighted Moving Average</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Averages recent periods with more weight on recent data. Good for stable demand. The <strong>Window</strong> parameter controls how many months to look back.</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Averages recent periods with configurable weights. <strong>Equal</strong> weights all months the same. <strong>Linear Decay</strong> gives more weight to recent months. The <strong>Window</strong> parameter controls lookback length.</div>
+            <div style="margin-top:8px; padding:8px 12px; background:#fff; border:1px solid #e5e7eb; border-radius:6px; font-family:ui-monospace,monospace; font-size:12px; color:#374151;">Forecast = Σ(weight[i] × value[i]), weights normalized to sum to 1</div>
           </div>
           <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
             <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Exponential Smoothing</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Weights all history with exponentially decaying weights. <strong>Alpha</strong> controls reactivity (0.1 = smooth, 0.9 = reactive). Includes damped drift to capture trend direction.</div>
-          </div>
-          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
-            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Linear Average</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Simple average of the lookback window, projected flat. Best for very stable, no-trend demand.</div>
-          </div>
-          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
-            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Linear Trend (Slope)</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Fits a straight line via regression, extrapolates the slope forward. Good when demand has a clear upward or downward trend.</div>
-          </div>
-          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
-            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Holt's Linear Trend</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Double exponential smoothing capturing both level and trend with damping. Prevents runaway trend extrapolation. <strong>Alpha</strong> controls level, <strong>Beta</strong> controls trend.</div>
-          </div>
-          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
-            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Croston's SBA</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Designed for intermittent demand (many zero months). Separately smooths demand size and interval between orders. SBA correction removes upward bias.</div>
-          </div>
-          <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
-            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Holt-Winters Seasonal</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Captures level + trend + seasonal pattern. Requires 24+ months of history. Multiplicative seasonality adjusts for proportional seasonal effects.</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Weights all history with exponentially decaying weights. <strong>Alpha</strong> controls reactivity (0.1 = smooth, 0.9 = reactive). Includes damped drift to capture trend direction without runaway extrapolation.</div>
+            <div style="margin-top:8px; padding:8px 12px; background:#fff; border:1px solid #e5e7eb; border-radius:6px; font-family:ui-monospace,monospace; font-size:12px; color:#374151;">Level(t) = α × Actual(t) + (1-α) × Level(t-1); Forecast = Level + damped drift</div>
           </div>
           <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
             <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">POS-to-Shipment Lag</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Uses POS data with a lag offset to predict shipments. Captures the delay between consumer purchase and replenishment orders.</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Analyzes the historical ratio between POS and shipment data offset by a lag period. Uses this ratio to project future shipments from recent POS trends. Requires POS data. The lag captures the delay between consumer purchase and replenishment orders (typically 1-3 months).</div>
+            <div style="margin-top:8px; padding:8px 12px; background:#fff; border:1px solid #e5e7eb; border-radius:6px; font-family:ui-monospace,monospace; font-size:12px; color:#374151;">Ratio = avg(Shipment[t] / POS[t-lag]); Forecast(t) = POS[t-lag] × Ratio</div>
           </div>
           <div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
-            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">POS Consumption Rate</div>
-            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Computes the ratio of POS to shipments, uses it to project future shipments from recent POS trends.</div>
+            <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:4px;">Linear Trend (Slope)</div>
+            <div style="font-size:13px; color:#4b5563; line-height:1.6;">Fits a straight line (y = a + bx) via least-squares regression over the lookback window, then extrapolates forward. Best when demand has a clear upward or downward trend. Values are floored at zero. Not ideal for cyclical data.</div>
+            <div style="margin-top:8px; padding:8px 12px; background:#fff; border:1px solid #e5e7eb; border-radius:6px; font-family:ui-monospace,monospace; font-size:12px; color:#374151;">slope = (n×Σxy - Σx×Σy) / (n×Σx² - (Σx)²); Forecast(t) = intercept + slope × t</div>
           </div>
         </div>
       </div>
@@ -969,7 +841,7 @@ function parseFile(buffer) {
 // ============================================================
 function getWeights(win, profile) {
   if (profile === 'linear_decay') {
-    const raw = Array.from({length: win}, (_, i) => win - i);
+    const raw = Array.from({length: win}, (_, i) => i + 1);
     const sum = raw.reduce((a,b) => a+b, 0);
     return raw.map(w => w / sum);
   }
@@ -1091,9 +963,9 @@ function extractSeries(rows, source) {
     if (source === 'pos') v = r.posCases;
     else if (source === 'invoice') v = r.invoiceCases;
     else if (source === 'order') v = r.orderCases;
-    else v = ((r.posCases||0)*0.5 + (r.orderCases||0)*0.5);
-    return { month: r.month, value: v != null ? v : 0 };
-  }).filter(p => p.value != null).sort((a,b) => a.month.localeCompare(b.month));
+    else v = (r.posCases === null && r.orderCases === null) ? null : ((r.posCases||0)*0.5 + (r.orderCases||0)*0.5);
+    return { month: r.month, value: v };
+  }).filter(p => p.value !== null && p.value !== undefined).map(p => ({ month: p.month, value: p.value || 0 })).sort((a,b) => a.month.localeCompare(b.month));
 }
 
 // Get weeks for a month key from the config
@@ -1162,17 +1034,8 @@ function runForecastEngine(actuals, params, horizon) {
       results = posToShipmentLag(pos, ship, 2, params.window, horizon);
       break;
     }
-    case 'consumption_rate': {
-      const pos = normalizeSeries(extractSeries(actuals, 'pos'));
-      const ord = normalizeSeries(extractSeries(actuals, 'order'));
-      results = consumptionRate(pos, ord, params.window, horizon);
-      break;
-    }
     case 'linear_avg': results = linearAverage(series, params, horizon); break;
     case 'linear_slope': results = linearSlope(series, params, horizon); break;
-    case 'holts': results = holtsLinearTrend(series, params, horizon); break;
-    case 'croston': results = crostonSBA(series, params, horizon); break;
-    case 'holt_winters': results = holtWintersMult(series, params, horizon); break;
     default: results = weightedMovingAverage(series, params, horizon);
   }
 
@@ -1194,7 +1057,7 @@ function runForecastEngine(actuals, params, horizon) {
   // Near-term: ratio reflects stocking/pipeline reality.
   // Long-term: orders converge to POS (replenishment = consumption).
   // TYPE=WT (wet) has 7-month lead time, so the decay curve is extended.
-  if (params.source === 'pos' && params.method !== 'pos_lag' && params.method !== 'consumption_rate') {
+  if (params.source === 'pos' && params.method !== 'pos_lag') {
     const posSeries = extractSeries(actuals, 'pos').filter(p => p.value > 0);
     const ordSeries = extractSeries(actuals, 'order').filter(p => p.value > 0);
     if (posSeries.length > 0 && ordSeries.length > 0) {
@@ -1495,35 +1358,22 @@ function detectSeasonality(values) {
 function showUpload() {
   document.getElementById('upload-view').classList.remove('hidden');
   document.getElementById('dashboard-view').classList.add('hidden');
-  document.getElementById('analytics-view').classList.add('hidden');
   document.getElementById('definitions-view').classList.add('hidden');
 }
 
 function showForecastView() {
   document.getElementById('upload-view').classList.add('hidden');
-  document.getElementById('analytics-view').classList.add('hidden');
   document.getElementById('definitions-view').classList.add('hidden');
   document.getElementById('dashboard-view').classList.remove('hidden');
-  // Update toggle buttons
   document.querySelectorAll('.page-toggle button').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.page-toggle button').forEach(b => { if (b.textContent === 'Forecast') b.classList.add('active'); });
 }
 
-function showAnalyticsView() {
-  document.getElementById('upload-view').classList.add('hidden');
-  document.getElementById('dashboard-view').classList.add('hidden');
-  document.getElementById('analytics-view').classList.remove('hidden');
-  document.getElementById('definitions-view').classList.add('hidden');
-  // Update toggle buttons
-  document.querySelectorAll('.page-toggle button').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.page-toggle button').forEach(b => { if (b.textContent === 'Analytics') b.classList.add('active'); });
-  renderAnalytics();
-}
+function showAnalyticsView() { showForecastView(); }
 
 function showDefinitionsView() {
   document.getElementById('upload-view').classList.add('hidden');
   document.getElementById('dashboard-view').classList.add('hidden');
-  document.getElementById('analytics-view').classList.add('hidden');
   document.getElementById('definitions-view').classList.remove('hidden');
   document.querySelectorAll('.page-toggle button').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.page-toggle button').forEach(b => { if (b.textContent === 'Definitions') b.classList.add('active'); });
@@ -2030,8 +1880,7 @@ function runForecast() {
         // Detect item type from filtered rows for lead time logic
         const itemType = (filtered.find(r => r.type) || {}).type || '';
         params.itemType = itemType;
-        // Always 18 months: data is aggregated to monthly buckets
-        const horizon = 18;
+        const horizon = parseInt(document.getElementById('cfg-horizon').value) || 18;
         const results = runForecastEngine(actualData, params, horizon);
         const key = (state.filters.customer || 'all') + '|' + (state.filters.product || 'all');
 
@@ -2154,27 +2003,10 @@ function findBestMethodForData(actualData, baseParams) {
   const hasPOS = actualData.some(r => (r.posCases || 0) > 0);
   const seasonInfo = detectSeasonality(values);
 
-  // Restrict methods by demand class
-  let methods;
-  switch (demandClass) {
-    case 'smooth':
-      methods = ['weighted_ma', 'exp_smoothing', 'linear_avg', 'linear_slope', 'holts'];
-      if (seasonInfo.seasonal) methods.push('holt_winters');
-      break;
-    case 'erratic':
-      methods = ['weighted_ma', 'exp_smoothing', 'linear_avg'];
-      break;
-    case 'intermittent':
-      methods = ['croston', 'linear_avg', 'weighted_ma'];
-      break;
-    case 'lumpy':
-      methods = ['croston', 'linear_avg'];
-      break;
-    default:
-      methods = ['weighted_ma', 'exp_smoothing', 'linear_avg', 'linear_slope', 'holts'];
-  }
-  if (hasPOS && (demandClass === 'smooth' || demandClass === 'erratic')) {
-    methods.push('pos_lag', 'consumption_rate');
+  // Available methods
+  let methods = ['linear_avg', 'weighted_ma', 'exp_smoothing', 'linear_slope'];
+  if (hasPOS) {
+    methods.push('pos_lag');
   }
 
   const windows = [3, 6, 9, 12, 18, 24];
@@ -2275,10 +2107,11 @@ function bulkForecast() {
         let results;
 
         // Use ensemble if recommended, otherwise single best method
+        const bulkHorizon = parseInt(document.getElementById('cfg-horizon').value) || 18;
         if (best.ensemble && best.ensemble.length >= 2) {
           const ensembleResults = best.ensemble.map(e => {
             const p = { ...skuParams, method: e.method, window: e.window, alpha: e.alpha };
-            return runForecastEngine(actualData, p, 18);
+            return runForecastEngine(actualData, p, bulkHorizon);
           }).filter(r => r.length > 0);
           if (ensembleResults.length >= 2) {
             results = ensembleResults[0].map((f, i) => ({
@@ -2288,12 +2121,12 @@ function bulkForecast() {
             methodCounts['ensemble'] = (methodCounts['ensemble'] || 0) + 1;
           } else {
             const params = { ...skuParams, method: best.method, window: best.window, alpha: best.alpha };
-            results = runForecastEngine(actualData, params, 18);
+            results = runForecastEngine(actualData, params, bulkHorizon);
             methodCounts[best.method] = (methodCounts[best.method] || 0) + 1;
           }
         } else {
           const params = { ...skuParams, method: best.method, window: best.window, alpha: best.alpha };
-          results = runForecastEngine(actualData, params, 18);
+          results = runForecastEngine(actualData, params, bulkHorizon);
           methodCounts[best.method] = (methodCounts[best.method] || 0) + 1;
         }
 
